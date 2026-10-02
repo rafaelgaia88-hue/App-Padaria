@@ -9,7 +9,7 @@ def exibir_cadastro(salvar_cliente_fn):
     st.markdown(
         """
         <div style='text-align: center; padding: 10px 0px;'>
-            <h1 style='font-size: 2.5rem; margin-bottom: 0;'>🥖 Padaria Doce Sabor</h1>
+            <h1 style='font-size: 2.5rem; margin-bottom: 0;'>🥖 Padaria Doce e Sabor</h1>
             <p style='font-size: 1.2rem; color: #FFA500; font-weight: bold; margin-top: 5px;'>
                 🔥 Avisos Direto na sua Tela!
             </p>
