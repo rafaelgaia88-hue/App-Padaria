@@ -10,7 +10,7 @@ from views.Painel_Operador import exibir_painel
 #  3- CONFIGURAÇÃO DA PÁGINA CENTRAL
 # ==========================================================================
 st.set_page_config(
-    page_title="Padaria Doce e Sabor",
+    page_title="Padaria Doce ee Sabor",
     page_icon="🥖",
     layout="centered",
     initial_sidebar_state="collapsed"
