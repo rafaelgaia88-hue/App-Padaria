@@ -13,6 +13,7 @@ ONESIGNAL_API_KEY = "cxbxmridgetgnjqiqsq3oxaoo"
 
 def disparar_notificacao_push(lista_ids, titulo, mensagem):
     """Função que envia o alerta simultâneo em massa para todos os IDs informados"""
+    # CORREÇÃO: Endpoint oficial correto para envio de notificações via API do OneSignal
     url = "https://onesignal.com"
 
     headers = {
@@ -24,14 +25,23 @@ def disparar_notificacao_push(lista_ids, titulo, mensagem):
         "app_id": ONESIGNAL_APP_ID,
         "include_subscription_ids": lista_ids,  # Envia para todos da lista simultaneamente
         "headings": {"en": titulo, "pt": titulo},
-        "contents": {"en": mensagem, "pt": mensagem},
-        "chrome_web_badge": "https://flaticon.com"
+        "contents": {"en": mensagem, "pt": mensagem}
     }
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps(payload))
-        return response.status_code == 200
-    except Exception:
+        # O OneSignal pode retornar 200 contendo uma lista de erros internos no JSON.
+        if response.status_code == 200:
+            dados_resposta = response.json()
+            if "errors" in dados_resposta:
+                st.error(f"⚠️ O OneSignal processou a requisição, mas reportou erros: {dados_resposta['errors']}")
+                return False
+            return True
+        else:
+            st.error(f"🔴 Erro HTTP do OneSignal: Status {response.status_code} - Resposta: {response.text}")
+            return False
+    except Exception as e:
+        st.error(f"💥 Falha crítica de conexão com o servidor de notificações: {e}")
         return False
 
 
@@ -119,7 +129,7 @@ def exibir_painel(ler_clientes_fn, limpar_banco_fn, salvar_cliente_fn=None):
                                 st.success("✨ Alerta enviado com sucesso para todos os aparelhos conectados!")
                                 st.balloons()
                             else:
-                                st.error("Falha ao enviar. Verifique se as chaves da API do OneSignal estão corretas.")
+                                st.error("Falha ao enviar. Verifique as mensagens de erro detalhadas exibidas acima.")
                 else:
                     st.warning(f"Nenhum aparelho ativo esperando {produto_selecionado} neste turno.")
             else:
