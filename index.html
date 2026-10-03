@@ -1,4 +1,4 @@
-    <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -7,13 +7,13 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1E1E1E">
     
-    <!-- SDK Oficial do OneSignal v16 atualizado -->
-    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+    <!-- SDK Oficial do OneSignal v16 -->
+    <script src="https://onesignal.com" defer></script>
     <script>
         const ONESIGNAL_APP_ID = "f41c3cb4-bef4-4144-9a2b-9f823fd5fe4d";
         const SAFARI_WEB_ID = "safari.web.id.onesignal.auto.2b467c5d-2ccd-4ce0-a57b-cb7ab9cfd0c8";
 
-        // Cria a fila segura exigida pela v16
+        // Cria a fila segura exigida pela v16 do OneSignal
         window.OneSignalDeferred = window.OneSignalDeferred || [];
         
         window.OneSignalDeferred.push(async function(OneSignal) {
@@ -23,7 +23,7 @@
                 allowLocalhostAsSecureOrigin: true
             });
 
-            // Se o usuário já tiver a permissão ativa de antes, já captura o ID automaticamente
+            // Se o cliente já aceitou a notificação no passado, já valida na hora
             let subscriptionId = OneSignal.User.PushSubscription.id;
             if (subscriptionId) {
                 configurarDispositivoConectado(subscriptionId);
@@ -38,14 +38,14 @@
             document.getElementById("btn-cadastrar").disabled = false;
         }
 
-        // CORREÇÃO DA V16: Executa a chamada usando a fila segura OneSignalDeferred
+        // Função do botão laranja corrigida para rodar dentro da fila assíncrona
         function autorizarNotificacoes() {
             const botao = document.getElementById("btn-autorizar");
             botao.innerText = "🔄 Verificando permissão...";
 
             window.OneSignalDeferred.push(async function(OneSignal) {
                 try {
-                    // Comando oficial correto para disparar o prompt nativo
+                    // Dispara o pedido nativo de Notificação Push no celular
                     await OneSignal.Notifications.requestPermission();
                     
                     let checaToken = setInterval(async () => {
@@ -76,6 +76,7 @@
                 return;
             }
 
+            // Envia as informações para o seu painel do Streamlit salvar no CSV
             const urlStreamlit = `https://streamlit.app{encodeURIComponent(nome)}&id=${encodeURIComponent(id_dispositivo)}&wpp=${encodeURIComponent(whatsapp)}&pref=${encodeURIComponent(preferencia)}&turno=${encodeURIComponent(turno)}`;
             window.location.href = urlStreamlit;
         }
