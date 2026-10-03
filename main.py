@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 
-# Importando as visualizações criadas dentro da pasta views conforme sua imagem
+# Importando as visualizações criadas dentro da pasta views
 from views.cadastro import exibir_cadastro
 from views.Painel_Operador import exibir_painel
 
@@ -21,11 +21,13 @@ def salvar_cliente_no_csv(nome, onesignal_id, whatsapp, preferencia, turno):
     # Se o mesmo aparelho já existir, atualiza os dados para não duplicar envios
     if onesignal_id in df_atual["Onesignal_ID"].values:
         df_atual.loc[df_atual["Onesignal_ID"] == onesignal_id, ["Nome", "WhatsApp", "Preferência", "Turno"]] = [nome, whatsapp, preferencia, turno]
-        df_atual.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
     else:
-        # Adiciona o novo registro completo
+        # Adiciona o novo registro completo usando concat para garantir estabilidade no Streamlit
         novo_registro = pd.DataFrame([{"Nome": nome, "Onesignal_ID": onesignal_id, "WhatsApp": whatsapp, "Preferência": preferencia, "Turno": turno}])
-        novo_registro.to_csv(ARQUIVO_CSV, mode='a', header=False, index=False, encoding="utf-8")
+        df_atual = pd.concat([df_atual, novo_registro], ignore_index=True)
+        
+    # Salva o arquivo atualizado de forma limpa
+    df_atual.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
 
 def ler_clientes_do_csv():
     inicializar_banco()
