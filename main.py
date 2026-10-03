@@ -139,7 +139,7 @@ if params.get("tela") != "operador":
         cadastrar = st.form_submit_button("Me Avise Quando Sair! 🔔", use_container_width=True)
         
         if cadastrar:
-            if not nome.strip() || not whatsapp.strip():
+            if not nome.strip() or not whatsapp.strip():
                 st.error("Preencha todos os campos obrigatórios!")
             elif not id_capturado:
                 st.error("Falta autorização técnica. Certifique-se de dar 'Permitir' no aviso do navegador.")
