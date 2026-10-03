@@ -4,8 +4,9 @@ import os
 import requests
 import json
 import shutil
+import streamlit.components.v1 as components
 
-# --- INJEÇÃO AUTOMÁTICA DO SERVICE WORKER NO STREAMLIT ---
+# --- INJEÇÃO AUTOMÁTICA E COPIAGEM DO SERVICE WORKER ---
 def injetar_service_worker():
     try:
         pagedir = os.path.dirname(st.__file__)
@@ -19,10 +20,11 @@ def injetar_service_worker():
 
 injetar_service_worker()
 
-# --- CONFIGURAÇÃO GLOBAL DO ARQUIVO ---
+# --- CONFIGURAÇÃO DO BANCO DE DADOS CSV ---
 ARQUIVO_CSV = "clientes_padaria.csv"
 ONESIGNAL_APP_ID = "f41c3cb4-bef4-4144-9a2b-9f823fd5fe4d"
 ONESIGNAL_API_KEY = "cxbxmridgetgnjqiqsq3oxaoo"
+SAFARI_WEB_ID = "safari.web.id.onesignal.auto.2b467c5d-2ccd-4ce0-a57b-cb7ab9cfd0c8"
 
 def inicializar_banco():
     if not os.path.exists(ARQUIVO_CSV) or os.stat(ARQUIVO_CSV).st_size == 0:
@@ -39,13 +41,10 @@ def ler_clientes_do_csv():
 def salvar_cliente_no_csv(nome, onesignal_id, whatsapp, preferencia, turno):
     inicializar_banco()
     df_atual = ler_clientes_do_csv()
-    
-    # Remove qualquer caractere que não seja número do WhatsApp
     wpp_limpo = "".join(filter(str.isdigit, str(whatsapp)))
     if not wpp_limpo.startswith("55") and len(wpp_limpo) >= 10:
         wpp_limpo = "55" + wpp_limpo
 
-    # Se o ID já existir, atualiza. Se não, adiciona
     if onesignal_id in df_atual["Onesignal_ID"].values:
         df_atual.loc[df_atual["Onesignal_ID"] == onesignal_id, ["Nome", "WhatsApp", "Preferência", "Turno"]] = [nome, wpp_limpo, preferencia, turno]
     else:
@@ -77,97 +76,132 @@ def disparar_notificacao_push(lista_ids, titulo, message):
         return False
 
 # ==========================================================================
-#  REGRAS DE ROTEAMENTO (O QUE MOSTRAR NA TELA)
+#  ROTEADOR CENTRAL DO SISTEMA UNIFICADO
 # ==========================================================================
 params = st.query_params
 
-# CASO 1: Captura o clique vindo do PWA do cliente e salva no CSV
-if params.get("acao") == "cadastrar":
-    st.set_page_config(page_title="Cadastro Realizado!", page_icon="🎉")
-    salvar_cliente_no_csv(
-        nome=params.get("nome"),
-        onesignal_id=params.get("id"),
-        whatsapp=params.get("wpp"),
-        preferencia=params.get("pref"),
-        turno=params.get("turno")
-    )
-    st.balloons()
+# VISÃO A: CADASTRO PÚBLICO DO CLIENTE (EXECUTA DIRETO NO STREAMLIT)
+if params.get("tela") != "operador":
+    st.set_page_config(page_title="Pão Quentinho - Inscrição", page_icon="🥖")
+    
+    # Injeção oficial do OneSignal via Slidedown nativo (Não sofre bloqueio de domínio)
+    onesignal_js = f"""
+    <script src="https://onesignal.com" defer></script>
+    <script>
+      window.OneSignalDeferred = window.OneSignalDeferred || [];
+      window.OneSignalDeferred.push(async function(OneSignal) {{
+        await OneSignal.init({{
+          appId: "{ONESIGNAL_APP_ID}",
+          safari_web_id: "{SAFARI_WEB_ID}",
+          allowLocalhostAsSecureOrigin: true
+        }});
+        
+        // Dispara o Slidedown Prompt nativo automaticamente na tela do usuário
+        await OneSignal.Notifications.requestPermission();
+        
+        setInterval(async () => {{
+            let subId = OneSignal.User.PushSubscription.id;
+            if (subId) {{
+                window.parent.postMessage({{
+                    type: 'streamlit:set_query_params',
+                    queryParams: {{ 'device_id': subId }}
+                }}, '*');
+            }}
+        }}, 1500);
+      }});
+    </script>
+    """
+    components.html(onesignal_js, height=0, width=0)
+    
     st.markdown(
         """
-        <div style='text-align: center; margin-top: 50px;'>
-            <span style='font-size: 5rem;'>🎉</span>
-            <h2 style='color: #28a745;'>Cadastro Realizado com Sucesso!</h2>
-            <p style='font-size: 1.2rem; color: #555;'>Você já está na lista. Pode fechar esta página e aguardar o aviso de pão quentinho direto no seu celular!</p>
+        <div style='text-align: center; background-color: #1E1E1E; padding: 20px; border-radius: 12px; border: 1px solid #FFA500; margin-bottom: 20px;'>
+            <h1 style='color: #FFF; margin: 0;'>🥖 Seja Bem-Vindo!</h1>
+            <p style='color: #FFA500; font-weight: bold;'>Padaria Doce Sabor</p>
+            <p style='color: #AAA; font-size: 0.9rem;'>Inscreva-se para receber avisos de fornadas direto no celular!</p>
         </div>
-        """, 
-        unsafe_allow_html=True
+        """, unsafe_allow_html=True
     )
-    st.stop()
-
-# CASO 2: Se não for um cadastro automático, abre o Painel do Operador normalmente
-st.set_page_config(page_title="Painel União - Cozinha", page_icon="👨‍🍳", layout="centered")
-
-if "logado" not in st.session_state:
-    st.session_state.logado = False
-
-if not st.session_state.logado:
-    st.subheader("🔒 Acesso Restrito - Padaria Doce Sabor")
-    senha = st.text_input("Digite a senha da cozinha:", type="password")
-    if st.button("Acessar Painel", use_container_width=True):
-        if senha == "docesabor123":
-            st.session_state.logado = True
-            st.rerun()
-        else:
-            st.error("Senha incorreta!")
-    st.stop()
-
-# --- INTERFACE OFICIAL DO PAINEL DO OPERADOR ---
-st.title("👨‍🍳 Painel de Controle da Cozinha")
-df_clientes = ler_clientes_do_csv()
-
-col_esquerda, col_direita = st.columns(2)
-
-with col_esquerda:
-    st.subheader("🔥 Gatilho do Forno")
-    produtos = ["🥖 Pão Francês", "🧀 Pão de Queijo", "🥐 Croissant"]
-    produto_sel = st.selectbox("O que acabou de sair?", produtos)
-    turno_sel = st.radio("Disparar para qual turno?", ["Manhã", "Tarde", "Todos os Turnos"], horizontal=True)
     
-    st.write("---")
-    titulo_alerta = f"🥖 Fornada de {produto_sel}!"
-    mensagem_alerta = "Acabou de sair quentinho do forno! Venha buscar o seu feito na hora. 🔥☕"
-    st.info(f"**Preview Alerta:**\n\n**Título:** {titulo_alerta}\n**Mensagem:** {mensagem_alerta}")
-
-    if len(df_clientes) > 0:
-        df_clientes["Preferência"] = df_clientes["Preferência"].astype(str).str.strip()
-        condicao = df_clientes["Preferência"] == produto_sel
+    id_capturado = params.get("device_id", None)
+    
+    with st.form("form_cliente_final"):
+        nome = st.text_input("Seu Nome *:")
+        whatsapp = st.text_input("Seu WhatsApp (com DDD) *:")
+        preferencia = st.selectbox("Qual fornada quer acompanhar?", ["🥖 Pão Francês", "🧀 Pão de Queijo", "🥐 Croissant"])
+        turno = st.selectbox("Qual horário você costuma vir à padaria?", ["Manhã", "Tarde", "Ambos"])
         
-        if turno_sel != "Todos os Turnos":
-            condicao = condicao & (df_clientes["Turno"].isin([turno_sel, "Ambos"]))
-            
-        clientes_filtrados = df_clientes[condicao]
-        lista_ids = clientes_filtrados["Onesignal_ID"].dropna().tolist()
-        
-        if len(lista_ids) > 0:
-            st.success(f"📢 {len(lista_ids)} dispositivos vão receber esse aviso!")
-            if st.button("🚀 DISPARAR NOTIFICAÇÃO AGORA", type="primary", use_container_width=True):
-                with st.spinner("Disparando sinais de push..."):
-                    if disparar_notificacao_push(lista_ids, titulo_alerta, mensagem_alerta):
-                        st.success("✨ Notificação enviada para todos com sucesso!")
-                        st.balloons()
-                    else:
-                        st.error("Falha ao enviar através do OneSignal.")
+        if id_capturado:
+            st.success("✅ Seu dispositivo foi reconhecido com sucesso!")
         else:
-            st.warning(f"Ninguém esperando por {produto_sel} neste turno.")
-    else:
-        st.warning("Nenhum cliente cadastrado na base de dados ainda.")
+            st.info("🔔 Aguarde o pop-up do navegador aparecer na tela e clique em 'Permitir'.")
+            
+        cadastrar = st.form_submit_button("Me Avise Quando Sair! 🔔", use_container_width=True)
+        
+        if cadastrar:
+            if not nome.strip() || not whatsapp.strip():
+                st.error("Preencha todos os campos obrigatórios!")
+            elif not id_capturado:
+                st.error("Falta autorização técnica. Certifique-se de dar 'Permitir' no aviso do navegador.")
+            else:
+                salvar_cliente_no_csv(nome, id_capturado, whatsapp, preferencia, turno)
+                st.balloons()
+                st.success("🎉 Perfeito! Cadastro salvo com sucesso.")
+                
+    st.write("---")
+    if st.button("🔐 Painel Interno", use_container_width=True):
+        st.query_params.clear()
+        st.query_params["tela"] = "operador"
+        st.rerun()
 
-with col_direita:
-    st.subheader("📋 Clientes Conectados")
-    if len(df_clientes) > 0:
-        st.dataframe(df_clientes, use_container_width=True, hide_index=True)
-        if st.button("❌ Zerar Lista de Clientes", use_container_width=True):
-            limpar_banco_csv()
-            st.rerun()
-    else:
-        st.info("Lista vazia.")
+# VISÃO B: PAINEL DE CONTROLE DA COZINHA (OPERADOR)
+else:
+    st.set_page_config(page_title="Painel União - Cozinha", page_icon="👨‍🍳", layout="centered")
+    if "logado" not in st.session_state: st.session_state.logado = False
+    
+    if not st.session_state.logado:
+        st.subheader("🔒 Acesso Restrito - Padaria Doce Sabor")
+        senha = st.text_input("Digite a senha da cozinha:", type="password")
+        if st.button("Acessar Painel", use_container_width=True):
+            if senha == "docesabor123":
+                st.session_state.logado = True
+                st.rerun()
+            else: st.error("Senha incorreta!")
+        st.stop()
+
+    st.title("👨‍🍳 Painel de Controle da Cozinha")
+    df_clientes = ler_clientes_do_csv()
+    col_esquerda, col_direita = st.columns(2)
+
+    with col_esquerda:
+        st.subheader("🔥 Gatilho do Forno")
+        produto_sel = st.selectbox("O que acabou de sair?", ["🥖 Pão Francês", "🧀 Pão de Queijo", "🥐 Croissant"])
+        turno_sel = st.radio("Disparar para qual turno?", ["Manhã", "Tarde", "Todos os Turnos"], horizontal=True)
+        
+        titulo_alerta = f"🥖 Fornada de {produto_sel}!"
+        mensagem_alerta = "Acabou de sair quentinho do forno! Venha buscar o seu feito na hora. 🔥☕"
+        
+        if len(df_clientes) > 0:
+            df_clientes["Preferência"] = df_clientes["Preferência"].astype(str).str.strip()
+            condicao = df_clientes["Preferência"] == produto_sel
+            if turno_sel != "Todos os Turnos":
+                condicao = condicao & (df_clientes["Turno"].isin([turno_sel, "Ambos"]))
+            lista_ids = df_clientes[condicao]["Onesignal_ID"].dropna().tolist()
+            
+            if len(lista_ids) > 0:
+                st.success(f"📢 {len(lista_ids)} dispositivos vão receber esse aviso!")
+                if st.button("🚀 DISPARAR NOTIFICAÇÃO AGORA", type="primary", use_container_width=True):
+                    if disparar_notificacao_push(lista_ids, titulo_alerta, mensagem_alerta):
+                        st.success("✨ Notificação enviada!")
+                        st.balloons()
+            else: st.warning("Ninguém esperando por este produto neste turno.")
+        else: st.warning("Nenhum cliente cadastrado.")
+
+    with col_direita:
+        st.subheader("📋 Clientes Conectados")
+        if len(df_clientes) > 0:
+            st.dataframe(df_clientes, use_container_width=True, hide_index=True)
+            if st.button("❌ Zerar Lista", use_container_width=True):
+                limpar_banco_csv()
+                st.rerun()
+        else: st.info("Lista vazia.")
