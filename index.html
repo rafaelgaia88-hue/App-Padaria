@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Padaria Doce Sabor - Pão Quentinho</title>
-    <!-- Vinculação com o arquivo de configuração do App -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1E1E1E">
     
-    <!-- SDK Oficial do OneSignal -->
     <script src="https://onesignal.com" async></script>
     <script>
         const ONESIGNAL_APP_ID = "f41c3cb4-bef4-4144-9a2b-9f823fd5fe4d";
@@ -21,30 +19,60 @@
                 safari_web_id: SAFARI_WEB_ID,
                 allowLocalhostAsSecureOrigin: true
             });
+
+            // Se o usuário já tiver a permissão ativa de antes, já captura o ID automaticamente
+            let subscriptionId = OneSignal.User.PushSubscription.id;
+            if (subscriptionId) {
+                configurarDispositivoConectado(subscriptionId);
+            }
         });
 
-        // Função do Botão Laranja
+        function configurarDispositivoConectado(subscriptionId) {
+            document.getElementById("onesignal_id").value = subscriptionId;
+            const botaoAutorizar = document.getElementById("btn-autorizar");
+            if (botaoAutorizar) botaoAutorizar.style.display = "none";
+            document.getElementById("status-container").innerHTML = "<div class='success'>✅ Aparelho Autorizado e Conectado!</div>";
+            document.getElementById("btn-cadastrar").disabled = false;
+        }
+
         async function autorizarNotificacoes() {
             try {
                 await OneSignal.Notifications.requestPermission();
                 const botao = document.getElementById("btn-autorizar");
-                const statusDiv = document.getElementById("status-container");
-                
                 botao.innerText = "🔄 Verificando permissão...";
                 
                 let checaToken = setInterval(async () => {
                     let subscriptionId = OneSignal.User.PushSubscription.id;
                     if (subscriptionId) {
                         clearInterval(checaToken);
-                        document.getElementById("onesignal_id").value = subscriptionId;
-                        botao.style.display = "none";
-                        statusDiv.innerHTML = "<div class='success'>✅ Aparelho Autorizado e Conectado!</div>";
-                        document.getElementById("btn-cadastrar").disabled = false;
+                        configurarDispositivoConectado(subscriptionId);
                     }
                 }, 1000);
             } catch(e) {
                 alert("Erro ao ativar notificações: " + e);
             }
+        }
+
+        // Função que faz o envio dos dados enviando o cliente para o Streamlit processar
+        function enviarCadastro(event) {
+            event.preventDefault();
+            
+            const nome = document.getElementById("nome").value.trim();
+            const whatsapp = document.getElementById("whatsapp").value.trim();
+            const id_dispositivo = document.getElementById("onesignal_id").value;
+            const preferencia = document.getElementById("preferencia").value;
+            const turno = document.getElementById("turno").value;
+
+            if (!nome || !whatsapp || !id_dispositivo) {
+                alert("Por favor, preencha todos os campos e autorize as notificações!");
+                return;
+            }
+
+            // Constrói a URL direcionando os dados de forma segura para o seu Streamlit ler
+            const urlStreamlit = `https://streamlit.app{encodeURIComponent(nome)}&id=${encodeURIComponent(id_dispositivo)}&wpp=${encodeURIComponent(whatsapp)}&pref=${encodeURIComponent(preferencia)}&turno=${encodeURIComponent(turno)}`;
+            
+            // Redireciona o cliente para concluir a gravação
+            window.location.href = urlStreamlit;
         }
     </script>
 
@@ -73,28 +101,25 @@
         <p style="font-size: 0.9rem; color: #AAA; margin: 10px 0 0 0;">Receba um aviso direto na tela do seu celular assim que o pão sair quentinho!</p>
     </div>
 
-    <div class="info">🔔 Para receber os avisos, clique primeiro no botão laranja abaixo e selecione "Permitir".</div>
-
     <div id="status-container" style="margin-bottom: 15px;"></div>
     <button type="button" id="btn-autorizar" class="btn btn-orange" onclick="autorizarNotificacoes()">👉 CLIQUE AQUI PARA AUTORIZAR NOTIFICAÇÕES 🔔</button>
 
-    <!-- Formulário apontando para o script Python do seu painel para salvar os dados -->
-    <form action="https://streamlit.app" method="POST" style="margin-top: 15px;">
+    <form onsubmit="enviarCadastro(event)" style="margin-top: 15px;">
         <input type="hidden" id="onesignal_id" name="onesignal_id" required>
         
         <div class="form-group">
             <label>Seu Nome *:</label>
-            <input type="text" name="nome" placeholder="Ex: João Silva" required>
+            <input type="text" id="nome" placeholder="Ex: João Silva" required>
         </div>
 
         <div class="form-group">
             <label>Seu WhatsApp (com DDD) *:</label>
-            <input type="tel" name="whatsapp" placeholder="Ex: 11999998888" required>
+            <input type="tel" id="whatsapp" placeholder="Ex: 11999998888" required>
         </div>
 
         <div class="form-group">
             <label>Qual fornada quer acompanhar?</label>
-            <select name="preferencia">
+            <select id="preferencia">
                 <option value="🥖 Pão Francês">🥖 Pão Francês</option>
                 <option value="🧀 Pão de Queijo">🧀 Pão de Queijo</option>
                 <option value="🥐 Croissant">🥐 Croissant</option>
@@ -103,7 +128,7 @@
 
         <div class="form-group">
             <label>Qual horário você costuma vir à padaria?</label>
-            <select name="turno">
+            <select id="turno">
                 <option value="Manhã">Manhã</option>
                 <option value="Tarde">Tarde</option>
                 <option value="Ambos">Ambos</option>
