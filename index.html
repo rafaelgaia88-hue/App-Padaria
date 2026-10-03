@@ -7,13 +7,16 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1E1E1E">
     
+    <!-- SDK Oficial do OneSignal v16 atualizado -->
     <script src="https://onesignal.com" async></script>
     <script>
         const ONESIGNAL_APP_ID = "f41c3cb4-bef4-4144-9a2b-9f823fd5fe4d";
         const SAFARI_WEB_ID = "safari.web.id.onesignal.auto.2b467c5d-2ccd-4ce0-a57b-cb7ab9cfd0c8";
 
-        window.OneSignal = window.OneSignal || [];
-        OneSignal.push(async function() {
+        // Cria a fila segura exigida pela v16
+        window.OneSignalDeferred = window.OneSignalDeferred || [];
+        
+        window.OneSignalDeferred.push(async function(OneSignal) {
             await OneSignal.init({
                 appId: ONESIGNAL_APP_ID,
                 safari_web_id: SAFARI_WEB_ID,
@@ -35,25 +38,30 @@
             document.getElementById("btn-cadastrar").disabled = false;
         }
 
-        async function autorizarNotificacoes() {
-            try {
-                await OneSignal.Notifications.requestPermission();
-                const botao = document.getElementById("btn-autorizar");
-                botao.innerText = "🔄 Verificando permissão...";
-                
-                let checaToken = setInterval(async () => {
-                    let subscriptionId = OneSignal.User.PushSubscription.id;
-                    if (subscriptionId) {
-                        clearInterval(checaToken);
-                        configurarDispositivoConectado(subscriptionId);
-                    }
-                }, 1000);
-            } catch(e) {
-                alert("Erro ao ativar notificações: " + e);
-            }
+        // CORREÇÃO DA V16: Executa a chamada usando a fila segura OneSignalDeferred
+        function autorizarNotificacoes() {
+            const botao = document.getElementById("btn-autorizar");
+            botao.innerText = "🔄 Verificando permissão...";
+
+            window.OneSignalDeferred.push(async function(OneSignal) {
+                try {
+                    // Comando oficial correto para disparar o prompt nativo
+                    await OneSignal.Notifications.requestPermission();
+                    
+                    let checaToken = setInterval(async () => {
+                        let subscriptionId = OneSignal.User.PushSubscription.id;
+                        if (subscriptionId) {
+                            clearInterval(checaToken);
+                            configurarDispositivoConectado(subscriptionId);
+                        }
+                    }, 1000);
+                } catch(e) {
+                    alert("Erro ao ativar notificações: " + e);
+                    botao.innerText = "👉 CLIQUE AQUI PARA AUTORIZAR NOTIFICAÇÕES 🔔";
+                }
+            });
         }
 
-        // Função que faz o envio dos dados enviando o cliente para o Streamlit processar
         function enviarCadastro(event) {
             event.preventDefault();
             
@@ -68,10 +76,7 @@
                 return;
             }
 
-            // Constrói a URL direcionando os dados de forma segura para o seu Streamlit ler
             const urlStreamlit = `https://streamlit.app{encodeURIComponent(nome)}&id=${encodeURIComponent(id_dispositivo)}&wpp=${encodeURIComponent(whatsapp)}&pref=${encodeURIComponent(preferencia)}&turno=${encodeURIComponent(turno)}`;
-            
-            // Redireciona o cliente para concluir a gravação
             window.location.href = urlStreamlit;
         }
     </script>
