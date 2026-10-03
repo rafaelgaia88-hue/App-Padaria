@@ -13,7 +13,6 @@
         const ONESIGNAL_APP_ID = "f41c3cb4-bef4-4144-9a2b-9f823fd5fe4d";
         const SAFARI_WEB_ID = "safari.web.id.onesignal.auto.2b467c5d-2ccd-4ce0-a57b-cb7ab9cfd0c8";
 
-        // Cria a fila segura exigida pela v16 do OneSignal
         window.OneSignalDeferred = window.OneSignalDeferred || [];
         
         window.OneSignalDeferred.push(async function(OneSignal) {
@@ -23,63 +22,16 @@
                 allowLocalhostAsSecureOrigin: true
             });
 
-            // Se o cliente já aceitou a notificação no passado, já valida na hora
-            let subscriptionId = OneSignal.User.PushSubscription.id;
-            if (subscriptionId) {
-                configurarDispositivoConectado(subscriptionId);
-            }
-        });
-
-        function configurarDispositivoConectado(subscriptionId) {
-            document.getElementById("onesignal_id").value = subscriptionId;
-            const botaoAutorizar = document.getElementById("btn-autorizar");
-            if (botaoAutorizar) botaoAutorizar.style.display = "none";
-            document.getElementById("status-container").innerHTML = "<div class='success'>✅ Aparelho Autorizado e Conectado!</div>";
-            document.getElementById("btn-cadastrar").disabled = false;
-        }
-
-        // Função do botão laranja corrigida para rodar dentro da fila assíncrona
-        function autorizarNotificacoes() {
-            const botao = document.getElementById("btn-autorizar");
-            botao.innerText = "🔄 Verificando permissão...";
-
-            window.OneSignalDeferred.push(async function(OneSignal) {
-                try {
-                    // Dispara o pedido nativo de Notificação Push no celular
-                    await OneSignal.Notifications.requestPermission();
-                    
-                    let checaToken = setInterval(async () => {
-                        let subscriptionId = OneSignal.User.PushSubscription.id;
-                        if (subscriptionId) {
-                            clearInterval(checaToken);
-                            configurarDispositivoConectado(subscriptionId);
-                        }
-                    }, 1000);
-                } catch(e) {
-                    alert("Erro ao ativar notificações: " + e);
-                    botao.innerText = "👉 CLIQUE AQUI PARA AUTORIZAR NOTIFICAÇÕES 🔔";
+            // Monitora em tempo real quando o cliente aceitar a notificação
+            setInterval(async () => {
+                let subscriptionId = OneSignal.User.PushSubscription.id;
+                if (subscriptionId) {
+                    document.getElementById("onesignal_id").value = subscriptionId;
+                    document.getElementById("status-container").innerHTML = "<div class='success'>✅ Notificações Ativas e Aparelho Conectado!</div>";
+                    document.getElementById("btn-cadastrar").disabled = false;
                 }
-            });
-        }
-
-        function enviarCadastro(event) {
-            event.preventDefault();
-            
-            const nome = document.getElementById("nome").value.trim();
-            const whatsapp = document.getElementById("whatsapp").value.trim();
-            const id_dispositivo = document.getElementById("onesignal_id").value;
-            const preferencia = document.getElementById("preferencia").value;
-            const turno = document.getElementById("turno").value;
-
-            if (!nome || !whatsapp || !id_dispositivo) {
-                alert("Por favor, preencha todos os campos e autorize as notificações!");
-                return;
-            }
-
-            // Envia as informações para o seu painel do Streamlit salvar no CSV
-            const urlStreamlit = `https://streamlit.app{encodeURIComponent(nome)}&id=${encodeURIComponent(id_dispositivo)}&wpp=${encodeURIComponent(whatsapp)}&pref=${encodeURIComponent(preferencia)}&turno=${encodeURIComponent(turno)}`;
-            window.location.href = urlStreamlit;
-        }
+            }, 1000);
+        });
     </script>
 
     <style>
@@ -90,11 +42,10 @@
         label { font-weight: bold; margin-bottom: 5px; color: #AAA; font-size: 14px; }
         input, select { padding: 12px; border-radius: 6px; border: 1px solid #444; background-color: #222; color: white; font-size: 16px; }
         .btn { width: 100%; padding: 14px; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.2s; margin-top: 10px; }
-        .btn-orange { background-color: #FFA500; color: white; box-shadow: 0px 4px 6px rgba(0,0,0,0.3); }
         .btn-green { background-color: #28a745; color: white; }
         .btn-green:disabled { background-color: #555; color: #888; cursor: not-allowed; }
-        .info { background-color: #17a2b8; padding: 12px; border-radius: 6px; font-size: 14px; margin-bottom: 15px; line-height: 1.4; text-align: center; }
-        .success { background-color: #28a745; padding: 12px; border-radius: 6px; text-align: center; font-weight: bold; }
+        .info { background-color: #FFA500; color: black; padding: 12px; border-radius: 6px; font-size: 14px; margin-bottom: 15px; line-height: 1.4; text-align: center; font-weight: bold; }
+        .success { background-color: #28a745; padding: 12px; border-radius: 6px; text-align: center; font-weight: bold; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -107,10 +58,11 @@
         <p style="font-size: 0.9rem; color: #AAA; margin: 10px 0 0 0;">Receba um aviso direto na tela do seu celular assim que o pão sair quentinho!</p>
     </div>
 
-    <div id="status-container" style="margin-bottom: 15px;"></div>
-    <button type="button" id="btn-autorizar" class="btn btn-orange" onclick="autorizarNotificacoes()">👉 CLIQUE AQUI PARA AUTORIZAR NOTIFICAÇÕES 🔔</button>
+    <div id="status-container">
+        <div class="info">🔔 Aguarde o aviso de notificação aparecer no topo da tela e clique em "Permitir" para liberar seu cadastro.</div>
+    </div>
 
-    <form onsubmit="enviarCadastro(event)" style="margin-top: 15px;">
+    <form onsubmit="enviarCadastro(event)">
         <input type="hidden" id="onesignal_id" name="onesignal_id" required>
         
         <div class="form-group">
@@ -144,6 +96,20 @@
         <button type="submit" id="btn-cadastrar" class="btn btn-green" disabled>Me Avise Quando Sair! 🔔</button>
     </form>
 </div>
+
+<script>
+    function enviarCadastro(event) {
+        event.preventDefault();
+        const nome = document.getElementById("nome").value.trim();
+        const whatsapp = document.getElementById("whatsapp").value.trim();
+        const id_dispositivo = document.getElementById("onesignal_id").value;
+        const preferencia = document.getElementById("preferencia").value;
+        const turno = document.getElementById("turno").value;
+
+        const urlStreamlit = `https://streamlit.app{encodeURIComponent(nome)}&id=${encodeURIComponent(id_dispositivo)}&wpp=${encodeURIComponent(whatsapp)}&pref=${encodeURIComponent(preferencia)}&turno=${encodeURIComponent(turno)}`;
+        window.location.href = urlStreamlit;
+    }
+</script>
 
 </body>
 </html>
