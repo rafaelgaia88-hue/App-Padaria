@@ -19,9 +19,7 @@ def injetar_service_worker():
 
 injetar_service_worker()
 
-# --- CONFIGURAÇÃO GLOBAL DA TELA DO OPERADOR ---
-st.set_page_config(page_title="Painel União - Cozinha", page_icon="👨‍🍳", layout="centered")
-
+# --- CONFIGURAÇÃO GLOBAL DO ARQUIVO ---
 ARQUIVO_CSV = "clientes_padaria.csv"
 ONESIGNAL_APP_ID = "f41c3cb4-bef4-4144-9a2b-9f823fd5fe4d"
 ONESIGNAL_API_KEY = "cxbxmridgetgnjqiqsq3oxaoo"
@@ -38,11 +36,29 @@ def ler_clientes_do_csv():
     except Exception:
         return pd.DataFrame(columns=["Nome", "Onesignal_ID", "WhatsApp", "Preferência", "Turno"])
 
+def salvar_cliente_no_csv(nome, onesignal_id, whatsapp, preferencia, turno):
+    inicializar_banco()
+    df_atual = ler_clientes_do_csv()
+    
+    # Remove qualquer caractere que não seja número do WhatsApp
+    wpp_limpo = "".join(filter(str.isdigit, str(whatsapp)))
+    if not wpp_limpo.startswith("55") and len(wpp_limpo) >= 10:
+        wpp_limpo = "55" + wpp_limpo
+
+    # Se o ID já existir, atualiza. Se não, adiciona
+    if onesignal_id in df_atual["Onesignal_ID"].values:
+        df_atual.loc[df_atual["Onesignal_ID"] == onesignal_id, ["Nome", "WhatsApp", "Preferência", "Turno"]] = [nome, wpp_limpo, preferencia, turno]
+    else:
+        novo_registro = pd.DataFrame([{"Nome": nome, "Onesignal_ID": onesignal_id, "WhatsApp": wpp_limpo, "Preferência": preferencia, "Turno": turno}])
+        df_atual = pd.concat([df_atual, novo_registro], ignore_index=True)
+        
+    df_atual.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
+
 def limpar_banco_csv():
     df = pd.DataFrame(columns=["Nome", "Onesignal_ID", "WhatsApp", "Preferência", "Turno"])
     df.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
 
-def disparar_notificacao_push(lista_ids, titulo, mensagem):
+def disparar_notificacao_push(lista_ids, titulo, message):
     url = "https://onesignal.com"
     headers = {
         "Content-Type": "application/json; charset=utf-8",
@@ -52,24 +68,45 @@ def disparar_notificacao_push(lista_ids, titulo, mensagem):
         "app_id": ONESIGNAL_APP_ID,
         "include_subscription_ids": lista_ids,
         "headings": {"en": titulo, "pt": titulo},
-        "contents": {"en": mensagem, "pt": mensagem}
+        "contents": {"en": message, "pt": message}
     }
     try:
         response = requests.post(url, headers=headers, data=json.dumps(payload))
-        if response.status_code == 200:
-            dados = response.json()
-            if "errors" in dados:
-                st.error(f"⚠️ Erro reportado pelo OneSignal: {dados['errors']}")
-                return False
-            return True
-        else:
-            st.error(f"🔴 Erro HTTP OneSignal: Status {response.status_code}")
-            return False
-    except Exception as e:
-        st.error(f"💥 Falha de conexão: {e}")
+        return response.status_code == 200
+    except Exception:
         return False
 
-# --- PROTEÇÃO POR SENHA ---
+# ==========================================================================
+#  REGRAS DE ROTEAMENTO (O QUE MOSTRAR NA TELA)
+# ==========================================================================
+params = st.query_params
+
+# CASO 1: Captura o clique vindo do PWA do cliente e salva no CSV
+if params.get("acao") == "cadastrar":
+    st.set_page_config(page_title="Cadastro Realizado!", page_icon="🎉")
+    salvar_cliente_no_csv(
+        nome=params.get("nome"),
+        onesignal_id=params.get("id"),
+        whatsapp=params.get("wpp"),
+        preferencia=params.get("pref"),
+        turno=params.get("turno")
+    )
+    st.balloons()
+    st.markdown(
+        """
+        <div style='text-align: center; margin-top: 50px;'>
+            <span style='font-size: 5rem;'>🎉</span>
+            <h2 style='color: #28a745;'>Cadastro Realizado com Sucesso!</h2>
+            <p style='font-size: 1.2rem; color: #555;'>Você já está na lista. Pode fechar esta página e aguardar o aviso de pão quentinho direto no seu celular!</p>
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
+    st.stop()
+
+# CASO 2: Se não for um cadastro automático, abre o Painel do Operador normalmente
+st.set_page_config(page_title="Painel União - Cozinha", page_icon="👨‍🍳", layout="centered")
+
 if "logado" not in st.session_state:
     st.session_state.logado = False
 
@@ -84,10 +121,8 @@ if not st.session_state.logado:
             st.error("Senha incorreta!")
     st.stop()
 
-# --- REGRAS DO INTERFACE DO OPERADOR ---
+# --- INTERFACE OFICIAL DO PAINEL DO OPERADOR ---
 st.title("👨‍🍳 Painel de Controle da Cozinha")
-st.write("Bem-vindo de volta, Chefe!")
-
 df_clientes = ler_clientes_do_csv()
 
 col_esquerda, col_direita = st.columns(2)
@@ -104,7 +139,6 @@ with col_esquerda:
     st.info(f"**Preview Alerta:**\n\n**Título:** {titulo_alerta}\n**Mensagem:** {mensagem_alerta}")
 
     if len(df_clientes) > 0:
-        # Filtragem Inteligente
         df_clientes["Preferência"] = df_clientes["Preferência"].astype(str).str.strip()
         condicao = df_clientes["Preferência"] == produto_sel
         
@@ -121,6 +155,8 @@ with col_esquerda:
                     if disparar_notificacao_push(lista_ids, titulo_alerta, mensagem_alerta):
                         st.success("✨ Notificação enviada para todos com sucesso!")
                         st.balloons()
+                    else:
+                        st.error("Falha ao enviar através do OneSignal.")
         else:
             st.warning(f"Ninguém esperando por {produto_sel} neste turno.")
     else:
@@ -135,8 +171,3 @@ with col_direita:
             st.rerun()
     else:
         st.info("Lista vazia.")
-
-st.write("---")
-if st.button("🚪 Sair do Painel", use_container_width=True):
-    st.session_state.logado = False
-    st.rerun()
