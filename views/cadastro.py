@@ -24,42 +24,6 @@ def exibir_cadastro(salvar_cliente_fn):
     )
 
     ONESIGNAL_APP_ID = "f41c3cb4-bef4-4144-9a2b-9f823fd5fe4d"
-
-    # Injeção JS limpa e sem erros de sintaxe
-    js_onesignal = f"""
-    <script src="https://onesignal.com" async></script>
-    <script>
-      window.OneSignal = window.OneSignal || [];
-      OneSignal.push(async function() {{
-        await OneSignal.init({{
-          appId: "{ONESIGNAL_APP_ID}",
-          allowLocalhostAsSecureOrigin: true
-        }});
-        
-        // Função global de disparo chamando o prompt nativo
-        window.dispararPromptNotificacao = async function() {{
-            try {{
-                await OneSignal.Notifications.requestPermission();
-                
-                let checaToken = setInterval(async () => {{
-                    let subscriptionId = OneSignal.User.PushSubscription.id;
-                    if (subscriptionId) {{
-                        clearInterval(checaToken);
-                        window.parent.postMessage({{
-                            type: 'streamlit:set_query_params',
-                            queryParams: {{ 'device_id': subscriptionId }}
-                        }}, '*');
-                    }}
-                }}, 1000);
-            }} catch(e) {{
-                console.error("Erro na ponte:", e);
-            }}
-        }}
-      }});
-    </script>
-    """
-    components.html(js_onesignal, height=0, width=0)
-
     device_id_capturado = st.query_params.get("device_id", None)
 
     # FORMULÁRIO DE CADASTRO
@@ -67,7 +31,8 @@ def exibir_cadastro(salvar_cliente_fn):
         nome = st.text_input("Seu Nome *:")
         whatsapp = st.text_input("Seu WhatsApp (com DDD) *:", placeholder="Ex: 11999998888")
 
-        produto = st.selectbox(
+        # Ajustado para "Preferência" para bater exatamente com as colunas do seu main.py
+        preferencia = st.selectbox(
             "Qual fornada quer acompanhar?",
             ["🥖 Pão Francês", "🧀 Pão de Queijo", "🥐 Croissant"]
         )
@@ -90,15 +55,44 @@ def exibir_cadastro(salvar_cliente_fn):
         else:
             st.info("🔔 Para validar, você precisa usar o botão de ativação de notificações abaixo.")
             
-            # CORREÇÃO: Chamada da função JavaScript limpa e simplificada
-            botao_ativar_html = """
-            <div style='text-align: center; margin: 5px 0;'>
-                <button type='button' onclick='window.parent.dispararPromptNotificacao()' style='width: 100%; background-color: #FFA500; color: white; border: none; padding: 12px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 14px; box-shadow: 0px 4px 6px rgba(0,0,0,0.2);'>
+            # SOLUÇÃO DA PONTE INTEGRADA: Junta o SDK da CDN oficial e resolve o escopo de execução do botão
+            ponte_onesignal_html = f"""
+            <script src="https://onesignal.com" async></script>
+            <script>
+              window.OneSignal = window.OneSignal || [];
+              OneSignal.push(async function() {{
+                await OneSignal.init({{
+                  appId: "{ONESIGNAL_APP_ID}",
+                  allowLocalhostAsSecureOrigin: true
+                }});
+              }});
+              
+              async function dispararPromptNotificacao() {{
+                try {{
+                    await OneSignal.Notifications.requestPermission();
+                    
+                    let checaToken = setInterval(async () => {{
+                        let subscriptionId = OneSignal.User.PushSubscription.id;
+                        if (subscriptionId) {{
+                            clearInterval(checaToken);
+                            window.parent.postMessage({{
+                                type: 'streamlit:set_query_params',
+                                queryParams: {{ 'device_id': subscriptionId }}
+                            }}, '*');
+                        }}
+                    }}, 1000);
+                }} catch(e) {{
+                    console.error("Erro na ponte de permissão:", e);
+                }}
+              }}
+            </script>
+            <div style='text-align: center;'>
+                <button type='button' onclick='dispararPromptNotificacao()' style='width: 100%; background-color: #FFA500; color: white; border: none; padding: 12px; font-weight: bold; border-radius: 6px; cursor: pointer; font-size: 14px; box-shadow: 0px 4px 6px rgba(0,0,0,0.2); font-family: sans-serif;'>
                     👉 CLIQUE AQUI PARA AUTORIZAR NOTIFICAÇÕES 🔔
                 </button>
             </div>
             """
-            components.html(botao_ativar_html, height=50)
+            components.html(ponte_onesignal_html, height=55)
 
         st.write("") 
         botao_cadastrar = st.form_submit_button("Me Avise Quando Sair! 🔔", use_container_width=True)
@@ -119,11 +113,13 @@ def exibir_cadastro(salvar_cliente_fn):
                 if not wpp_limpo.startswith("55"):
                     wpp_limpo = "55" + wpp_limpo
 
-                salvar_cliente_fn(nome, device_id_capturado, wpp_limpo, produto, turno)
+                # Variáveis enviadas batendo perfeitamente com a assinatura da função no seu main.py
+                salvar_cliente_fn(nome, device_id_capturado, wpp_limpo, preferencia, turno)
                 st.balloons()
                 st.success(f"🎉 Perfeito, {nome}! Cadastro realizado. Avisaremos você direto na tela!")
 
     st.write("---")
     if st.button("🔐 Painel de Controle (Uso Interno)", use_container_width=True):
+        st.query_params.clear() # Limpa o device_id ao ir para a tela do operador
         st.query_params["tela"] = "operador"
         st.rerun()
