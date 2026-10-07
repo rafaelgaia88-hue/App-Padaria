@@ -7,8 +7,15 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1E1E1E">
     
-    <!-- 1- CORREÇÃO: Link oficial do SDK Web v16 do OneSignal (Carrega as funções de verdade) -->
+    <!-- ==========================================================================
+    1- IMPORTAÇÃO DO SDK WEB OFICIAL DO ONESIGNAL (CDN CORRIGIDA)
+    ========================================================================== -->
+    <!-- Carrega a biblioteca de funções v16 necessária para disparar o pop-up nativo -->
     <script src="https://onesignal.com" defer></script>
+    
+    <!-- ==========================================================================
+    2- INICIALIZAÇÃO TÉCNICA E CAPTURA DE ID DO DISPOSITIVO
+    ========================================================================== -->
     <script>
         const ONESIGNAL_APP_ID = "f41c3cb4-bef4-4144-9a2b-9f823fd5fe4d";
         const SAFARI_WEB_ID = "safari.web.id.onesignal.auto.2b467c5d-2ccd-4ce0-a57b-cb7ab9cfd0c8";
@@ -16,15 +23,18 @@
         window.OneSignalDeferred = window.OneSignalDeferred || [];
         
         window.OneSignalDeferred.push(async function(OneSignal) {
+            // Inicializa a conexão segura com a sua conta do OneSignal
             await OneSignal.init({
                 appId: ONESIGNAL_APP_ID,
                 safari_web_id: SAFARI_WEB_ID,
                 allowLocalhostAsSecureOrigin: true
             });
 
-            // 2- Monitoramento ativo para capturar o ID assim que o cliente permitir
+            // Monitora em tempo real a liberação do Push pelo navegador do cliente
             setInterval(async () => {
                 let subscriptionId = OneSignal.User.PushSubscription.id;
+                
+                // Se o ID único do aparelho for gerado, atualiza a interface e libera o formulário
                 if (subscriptionId) {
                     document.getElementById("onesignal_id").value = subscriptionId;
                     document.getElementById("status-container").innerHTML = "<div class='success'>✅ Notificações Ativas e Aparelho Conectado!</div>";
@@ -34,6 +44,9 @@
         });
     </script>
 
+    <!-- ==========================================================================
+    3- ESTILIZAÇÃO VISUAL DA INTERFACE (CSS DESIGN ESCURO)
+    ========================================================================== -->
     <style>
         body { background-color: #121212; color: #FFF; font-family: sans-serif; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { max-width: 400px; width: 100%; }
@@ -51,6 +64,9 @@
 <body>
 
 <div class="container">
+    <!-- ==========================================================================
+    4- BANNER PRINCIPAL DE MARKETING DO BALCÃO
+    ========================================================================== -->
     <div class="banner">
         <span style="font-size: 3.5rem;">🥖</span>
         <h1 style="font-size: 2rem; margin: 10px 0 0 0;">Seja Bem-Vindo!</h1>
@@ -58,11 +74,18 @@
         <p style="font-size: 0.9rem; color: #AAA; margin: 10px 0 0 0;">Receba um aviso direto na tela do seu celular assim que o pão sair quentinho!</p>
     </div>
 
+    <!-- ==========================================================================
+    5- RECIPIENTE DINÂMICO PARA ALERTAS DE STATUS TÉCNICO
+    ========================================================================== -->
     <div id="status-container">
         <div class="info">🔔 Aguarde o aviso de notificação aparecer no topo da tela e clique em "Permitir" para liberar seu cadastro.</div>
     </div>
 
+    <!-- ==========================================================================
+    6- FORMULÁRIO DE CAPTAÇÃO E SEGMENTAÇÃO DE PREFERÊNCIAS
+    ========================================================================== -->
     <form onsubmit="enviarCadastro(event)">
+        <!-- Input invisível que guarda o token do OneSignal gerado pelo Bloco 2 -->
         <input type="hidden" id="onesignal_id" name="onesignal_id" required>
         
         <div class="form-group">
@@ -93,27 +116,32 @@
             </select>
         </div>
 
+        <!-- Botão inicia desativado e só liga quando o Bloco 2 captura o OneSignal_ID -->
         <button type="submit" id="btn-cadastrar" class="btn btn-green" disabled>Me Avise Quando Sair! 🔔</button>
     </form>
 </div>
 
+<!-- ==========================================================================
+7- LOGICA DE CONCATENAÇÃO E REDIRECIONAMENTO COM QUERY PARAMETERS
+========================================================================== -->
 <script>
     function enviarCadastro(event) {
         event.preventDefault();
+        
+        // Coleta todos os valores digitados e limpa espaços vazios
         const nome = document.getElementById("nome").value.trim();
         const whatsapp = document.getElementById("whatsapp").value.trim();
         const id_dispositivo = document.getElementById("onesignal_id").value;
         const preferencia = document.getElementById("preferencia").value;
         const turno = document.getElementById("turno").value;
 
-        // 3- ATENÇÃO: COLOQUE O LINK DO SEU APLICATIVO DO STREAMLIT CLOUD ABAIXO
-        // Exemplo: https://streamlit.app
+        // Endereço base de produção hospedado no Streamlit Cloud (sem barra final)
         const linkDoSeuStreamlit = "https://streamlit.app";
 
-        // 4- CORREÇÃO: Sintaxe de Template Literal corrigida (\$ adicionado) e parâmetros estruturados para a URL
+        // Monta a string de parâmetros injetando o ponto de interrogação (?) e codificando os textos para URLs limpas
         const urlStreamlit = `${linkDoSeuStreamlit}?nome=${encodeURIComponent(nome)}&id=${encodeURIComponent(id_dispositivo)}&wpp=${encodeURIComponent(whatsapp)}&pref=${encodeURIComponent(preferencia)}&turno=${encodeURIComponent(turno)}`;
         
-        // Redireciona o cliente para o Streamlit com os dados preenchidos de forma segura
+        // Dispara o redirecionamento forçando o carregamento das variáveis no main.py
         window.location.href = urlStreamlit;
     }
 </script>
