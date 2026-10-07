@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1E1E1E">
     
-    <!-- SDK Oficial do OneSignal v16 -->
+    <!-- 1- CORREÇÃO: Link oficial do SDK Web v16 do OneSignal (Carrega as funções de verdade) -->
     <script src="https://onesignal.com" defer></script>
     <script>
         const ONESIGNAL_APP_ID = "f41c3cb4-bef4-4144-9a2b-9f823fd5fe4d";
@@ -22,7 +22,7 @@
                 allowLocalhostAsSecureOrigin: true
             });
 
-            // Monitora em tempo real quando o cliente aceitar a notificação
+            // 2- Monitoramento ativo para capturar o ID assim que o cliente permitir
             setInterval(async () => {
                 let subscriptionId = OneSignal.User.PushSubscription.id;
                 if (subscriptionId) {
@@ -106,7 +106,14 @@
         const preferencia = document.getElementById("preferencia").value;
         const turno = document.getElementById("turno").value;
 
-        const urlStreamlit = `https://streamlit.app{encodeURIComponent(nome)}&id=${encodeURIComponent(id_dispositivo)}&wpp=${encodeURIComponent(whatsapp)}&pref=${encodeURIComponent(preferencia)}&turno=${encodeURIComponent(turno)}`;
+        // 3- ATENÇÃO: COLOQUE O LINK DO SEU APLICATIVO DO STREAMLIT CLOUD ABAIXO
+        // Exemplo: https://streamlit.app
+        const linkDoSeuStreamlit = "COLOQUE_AQUI_O_LINK_DO_SEU_STREAMLIT_CLOUD";
+
+        // 4- CORREÇÃO: Sintaxe de Template Literal corrigida (\$ adicionado) e parâmetros estruturados para a URL
+        const urlStreamlit = `${linkDoSeuStreamlit}?nome=${encodeURIComponent(nome)}&id=${encodeURIComponent(id_dispositivo)}&wpp=${encodeURIComponent(whatsapp)}&pref=${encodeURIComponent(preferencia)}&turno=${encodeURIComponent(turno)}`;
+        
+        // Redireciona o cliente para o Streamlit com os dados preenchidos de forma segura
         window.location.href = urlStreamlit;
     }
 </script>
