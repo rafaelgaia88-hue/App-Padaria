@@ -1,21 +1,9 @@
 {
-  "name": "Padaria Doce Sabor - Pão Quentinho",
-  "short_name": "Pão Quentinho",
-  "start_url": "index.html",
+  "name": "Padaria Doce Sabor",
+  "short_name": "Doce Sabor",
+  "start_url": ".",
   "display": "standalone",
   "background_color": "#121212",
-  "theme_color": "#1E1E1E",
-  "orientation": "portrait",
-  "icons": [
-    {
-      "src": "logo192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "logo512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    }
-  ]
+  "theme_color": "#1E1E1E"
 }
+
